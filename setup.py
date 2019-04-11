@@ -25,6 +25,8 @@ setup(
     install_requires=get_requirements(),
     extras_require={
         'dev': get_requirements('dev'),
+        'gpu': get_requirements('gpu'),
+        'cpu': get_requirements('cpu')
     },
     description='SLEAP (Social LEAP Estimates Animal Pose) is a deep learning framework for estimating animal pose.',
     long_description=long_description,
@@ -33,11 +35,11 @@ setup(
     url='https://github.com/murthylab/sleap',
     keywords='deep learning, pose estimation, tracking, neuroscience',
     license='Apache 2',
-    packages=find_packages(exclude=['tensorflow']),
+    packages=find_packages(),
     entry_points = {
         'console_scripts': [
             'sleap-label=sleap.gui.app:main',
-            'sleap-train=sleap.training:main'
+            'sleap-train=sleap.training:main',
         ],
     },
     python_requires='>=3.6'

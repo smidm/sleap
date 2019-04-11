@@ -1,7 +1,7 @@
 #!/bin/bash
 
 module load anaconda
-module load cudnn/cuda-10.0/7.3.1
+module load cudnn/cuda-9.0/7.0.3
 
 conda activate sleap
 

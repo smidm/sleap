@@ -3,7 +3,8 @@
     "cattrs",
     "opencv-python",
     "PySide2",
-    "imgaug"
+    "imgaug",
+    "qimage2ndarray"
 ) %}
 
 {% set data = load_setup_py_data() %}
@@ -24,7 +25,6 @@ about:
 
 build:
   number: 0
-  noarch: python
 
 source:
   path: ../
@@ -39,7 +39,10 @@ requirements:
     - networkx
     - tensorflow-gpu
     - keras
+    - scikit-learn
     - h5py
+    - pandas
+    - Shapely
 
   run:
     - python
@@ -48,5 +51,7 @@ requirements:
     - networkx
     - tensorflow-gpu
     - keras
+    - scikit-learn
     - h5py
-
+    - pandas
+    - Shapely

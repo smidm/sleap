@@ -2,9 +2,11 @@ attrs
 cattrs==1.0.0rc
 jsonpickle
 networkx
-tensorflow
+tensorflow-gpu
 keras
 h5py
 opencv-python
 pandas
 PySide2
+qimage2ndarray==1.8
+imgaug
