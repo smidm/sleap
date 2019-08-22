@@ -427,12 +427,10 @@ class Predictor:
 
         # Predict centroid confidence maps, then find peaks
 
-        centroid_confmaps = model_package["model"].predict(centroid_imgs_scaled.astype("float32") / 255,
-                                                batch_size=self.inference_batch_size)
-
-        peaks, peak_vals = find_all_peaks(centroid_confmaps,
-                                            min_thresh=self.nms_min_thresh,
-                                            sigma=self.nms_sigma)
+        peaks, peak_vals = peak_tf_inference(
+                            model = model_package["model"],
+                            data = centroid_imgs_scaled.astype("float32")/255,
+                            min_thresh=self.nms_min_thresh)
 
         # Get training bounding box size to determine (min) centroid crop size
 
