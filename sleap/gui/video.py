@@ -299,6 +299,39 @@ class QtVideoPlayer(QWidget):
         if callable(on_each):
             on_each(indexes)
 
+    def gatherSignals(self,
+                signal: Signal,
+                seq_len: int,
+                on_done: Callable,
+                on_each: Callable = None):
+
+        results = []
+
+        # Define function that will be called on the signal
+        def handle_selection(*args,
+                             seq_len=seq_len,
+                             results=results,
+                             on_done=on_done,
+                             on_each=on_each):
+
+            results.append(args)
+
+            # If we have all the instances we want in our sequence, we're done
+            if len(results) >= seq_len:
+                # remove this handler
+                signal.disconnect(handle_selection)
+                # trigger success, passing the list of selected results
+                on_done(results)
+            # If we're still in progress...
+            else:
+                if callable(on_each):
+                    on_each(results)
+
+        signal.connect(handle_selection)
+
+        if callable(on_each):
+            on_each(results)
+
     @staticmethod
     def _signal_once(signal, callback):
         def call_once(*args):
@@ -306,9 +339,12 @@ class QtVideoPlayer(QWidget):
             callback(*args)
         signal.connect(call_once)
 
-    def onPointSelection(self, callback: Callable):
+    def setClickMode(self):
         self.view.click_mode = "point"
         self.view.setCursor(Qt.CrossCursor)
+
+    def onPointSelection(self, callback: Callable):
+        self.setClickMode()
         self._signal_once(self.view.pointSelected, callback)
 
     def onAreaSelection(self, callback: Callable):
@@ -606,7 +642,15 @@ class GraphicsView(QGraphicsView):
         has_moved = (event.pos() != self._down_pos)
         if event.button() == Qt.LeftButton:
 
-            if self.click_mode == "":
+            current_click_mode = self.click_mode
+
+            # Clear the click mode here in case one of the functions we
+            # trigger below wants to set the click mode.
+
+            self.click_mode = ""
+            self.unsetCursor()
+
+            if current_click_mode == "":
                 # Check if this was just a tap (not a drag)
                 if not has_moved:
                     # When just a tap, see if there's an item underneath to select
@@ -621,7 +665,7 @@ class GraphicsView(QGraphicsView):
                         # instance.selected = (instance in clicked)
                     self.updatedSelection.emit()
 
-            elif self.click_mode == "area":
+            elif current_click_mode == "area":
                 # Check if user was selecting rectangular area
                 selection_rect = self.scene.selectionArea().boundingRect()
 
@@ -630,12 +674,10 @@ class GraphicsView(QGraphicsView):
                         selection_rect.top(),
                         selection_rect.right(),
                         selection_rect.bottom())
-            elif self.click_mode == "point":
+
+            elif current_click_mode == "point":
                 selection_point = scenePos
                 self.pointSelected.emit(scenePos.x(), scenePos.y())
-
-            self.click_mode = ""
-            self.unsetCursor()
 
             # finish drag
             self.setDragMode(QGraphicsView.NoDrag)

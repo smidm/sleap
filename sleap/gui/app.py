@@ -222,7 +222,7 @@ class MainWindow(QMainWindow):
         ### Label Menu ###
 
         labelMenu = self.menuBar().addMenu("Labels")
-        self._menu_actions["add instance"] = labelMenu.addAction("Add Instance", self.newInstance, shortcuts["add instance"])
+        self._menu_actions["add instance"] = labelMenu.addAction("Add Instance", self.newInstanceClicks, shortcuts["add instance"])
         self._menu_actions["delete instance"] = labelMenu.addAction("Delete Instance", self.deleteSelectedInstance, shortcuts["delete instance"])
 
         labelMenu.addSeparator()
@@ -1011,6 +1011,33 @@ class MainWindow(QMainWindow):
         self.updateSeekbarMarks()
         self.changestack_push("new predictions")
 
+    def newInstanceClicks(self):
+        """Add a new instance by letting the user click for each node."""
+
+        new_instance = Instance(skeleton=self.skeleton)
+
+        def on_each(points):
+            completed_count = len(points)
+            if completed_count < len(new_instance.skeleton.nodes):
+                self.player.setClickMode()
+                next_node = new_instance.skeleton.nodes[completed_count]
+                self.updateStatusMessage(f"Click to place node {next_node.name}...")
+            else:
+                self.updateStatusMessage()
+
+        def on_done(points):
+            for i in range(len(points)):
+                node = new_instance.skeleton.nodes[i]
+                new_instance[node] = Point(*points[i])
+            self._addInstance(new_instance)
+
+        self.player.gatherSignals(
+                signal = self.player.view.pointSelected,
+                seq_len = len(new_instance.skeleton.nodes),
+                on_done = on_done,
+                on_each = on_each
+        )
+
     def newInstance(self, copy_instance=None):
         if self.labeled_frame is None:
             return
@@ -1079,6 +1106,9 @@ class MainWindow(QMainWindow):
         if hasattr(copy_instance, "score") or from_prev_frame:
             new_instance.track = copy_instance.track
 
+        self._addInstance(new_instance)
+
+    def _addInstance(self, new_instance):
         # Add the instance
         self.labels.add_instance(self.labeled_frame, new_instance)
         self.changestack_push("new instance")
