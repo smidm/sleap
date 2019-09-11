@@ -1,3 +1,6 @@
+import logging
+logger = logging.getLogger(__name__)
+
 from inspect import signature
 import itertools
 import numpy as np
@@ -33,36 +36,58 @@ def matched_instance_distances(
         * predicted points matrix: (instances * nodes * 2)
     """
 
+    videos = []
     frame_idxs = []
     points_gt = []
     points_pr = []
-    for lf_gt in labels_gt.find(labels_gt.videos[0]):
-        frame_idx = lf_gt.frame_idx
+    for video_gt in labels_gt.videos:
 
-        # Get instances from ground truth/predicted labels
-        instances_gt = lf_gt.instances
-        lfs_pr = labels_pr.find(labels_pr.videos[0], frame_idx=frame_idx)
-        if len(lfs_pr):
-            instances_pr = lfs_pr[0].instances
-        else:
-            instances_pr = []
+        # Find matching video instance in predictions.
+        video_pr = None
+        for video in labels_pr.videos:
+            if video.matches(video_gt):
+                video_pr = video
+                break
 
-        # Sort ground truth and predicted instances.
-        # We'll then compare points between corresponding items in lists.
-        # We can use different "match" functions depending on what we want.
-        sorted_gt, sorted_pr = match_lists_function(instances_gt, instances_pr)
+        if not video_pr:
+            logger.info(f"No matching video in predictions for: {repr(video_gt)}")
+            continue
 
-        # Convert lists of instances to (instances, nodes, 2) matrices.
-        # This allows match_lists_function to return data as either
-        # a list of Instances or a (instances, nodes, 2) matrix.
-        if type(sorted_gt[0]) != np.ndarray:
-            sorted_gt = list_points_array(sorted_gt)
-        if type(sorted_pr[0]) != np.ndarray:
-            sorted_pr = list_points_array(sorted_pr)
+        # Find user labeled frames in this video.
+        labeled_frames_gt = [lf for lf in labels_gt.find(video_gt) if lf.has_user_instances]
 
-        points_gt.append(sorted_gt)
-        points_pr.append(sorted_pr)
-        frame_idxs.extend([frame_idx]*len(sorted_gt))
+        for lf_gt in labeled_frames_gt:
+            frame_idx = lf_gt.frame_idx
+
+            # Get instances from ground truth/predicted labels
+            instances_gt = lf_gt.user_instances
+            lfs_pr = labels_pr.find(video_pr, frame_idx=frame_idx)
+            if len(lfs_pr):
+                instances_pr = lfs_pr[0].instances
+            else:
+                instances_pr = []
+
+            logger.info(f"{len(instances_pr)}/{len(instances_gt)} matching instances in predictions for video {repr(video_gt)} -> frame {frame_idx}.")
+            if not instances_pr:
+                continue
+
+            # Sort ground truth and predicted instances.
+            # We'll then compare points between corresponding items in lists.
+            # We can use different "match" functions depending on what we want.
+            sorted_gt, sorted_pr = match_lists_function(instances_gt, instances_pr)
+
+            # Convert lists of instances to (instances, nodes, 2) matrices.
+            # This allows match_lists_function to return data as either
+            # a list of Instances or a (instances, nodes, 2) matrix.
+            if type(sorted_gt[0]) != np.ndarray:
+                sorted_gt = list_points_array(sorted_gt)
+            if type(sorted_pr[0]) != np.ndarray:
+                sorted_pr = list_points_array(sorted_pr)
+
+            points_gt.append(sorted_gt)
+            points_pr.append(sorted_pr)
+            frame_idxs.extend([frame_idx] * len(sorted_gt))
+            videos.extend([video_gt] * len(sorted_gt))
 
     # Convert arrays to numpy matrixes
     # instances * nodes * (x,y)
@@ -73,7 +98,7 @@ def matched_instance_distances(
     # ground truth and predicted instances.
     D = np.linalg.norm(points_gt - points_pr, axis=2)
 
-    return frame_idxs, D, points_gt, points_pr
+    return videos, frame_idxs, D, points_gt, points_pr
 
 def match_instance_lists(
         instances_a: List[Union[Instance, PredictedInstance]],
