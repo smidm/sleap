@@ -266,7 +266,8 @@ class MediaVideo:
         # Load if not already loaded
         if self._test_frame_ is None:
             # Lets grab a test frame to help us figure things out about the video
-            self._test_frame_ = self.get_frame(0, grayscale=False)
+            test_idx = self.frames // 2
+            self._test_frame_ = self.get_frame(test_idx, grayscale=False)
 
         # Return stored test frame
         return self._test_frame_
