@@ -232,6 +232,7 @@ class MediaVideo:
     _detect_grayscale = False
     _reader_ = None
     _test_frame_ = None
+    _frame_count = None
 
     @grayscale.default
     def __grayscale_default__(self):
@@ -291,18 +292,64 @@ class MediaVideo:
         """Returns frames per second of video."""
         return self.__reader.get(cv2.CAP_PROP_FPS)
 
+    def is_valid_frame(self, frame_idx):
+        """
+        Checks whether we consistently get same frame data for frame index.
+
+        Some non-"seekable" videos will have bad frames at the beginning and/or
+        end. If we try to access these frames, we get different data (or no
+        data) each time.
+
+        Args:
+            frame_idx: The frame index to check.
+
+        Returns:
+            True if we get consistent data when loading frame.
+        """
+        try:
+            return np.all(self.get_frame(frame_idx) == self.get_frame(frame_idx))
+        except TypeError:
+            return False
+
+    @property
+    def accurate_frame_count(self) -> int:
+        """Returns frame count by searching for last valid frame."""
+        # Get the frame count from the video metadata
+        purported_count = int(self.__reader.get(cv2.CAP_PROP_FRAME_COUNT))
+
+        # Check that we can load the last frame
+        if self.is_valid_frame(purported_count - 1):
+            return purported_count
+
+        # Since we can't load last frame, there must be some bad frames at
+        # the end of the video.
+
+        # Find a margin large enough to contain all the invalid frames.
+        margin = 64
+        while not self.is_valid_frame(purported_count - margin):
+            margin *= 2
+            if margin > purported_count:
+                return 0
+
+        # Now do binary search between margin and purported end to find last
+        # valid frame.
+        x = purported_count - margin
+        step = margin // 2
+        while step > 1:
+            x = x + step if self.is_valid_frame(x) else x - step
+            step = step // 2
+        return x
+
     # The properties and methods below complete our contract with the
     # higher level Video interface.
 
     @property
     def frames(self):
         """See :class:`Video`."""
-        return int(self.__reader.get(cv2.CAP_PROP_FRAME_COUNT))
-
-    @property
-    def frames_float(self):
-        """See :class:`Video`."""
-        return self.__reader.get(cv2.CAP_PROP_FRAME_COUNT)
+        if self._frame_count is None:
+            # Cache frame count since this may require checking frame data.
+            self._frame_count = self.accurate_frame_count
+        return self._frame_count
 
     @property
     def channels(self):
