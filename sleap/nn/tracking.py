@@ -66,8 +66,13 @@ def instance_iou(
 
 
 def hungarian_matching(cost_matrix: np.ndarray) -> List[Tuple[int, int]]:
-    """Wrapper for Hungarian matching algorithm in scipy."""
+    """Wrapper for Hungarian matching algorithm in scipy.
 
+    Expects that the costs in cost_matrix will be negative or 0, since
+    we replace any np.inf in matrix with 0.
+    """
+
+    cost_matrix[np.isinf(cost_matrix)] = 0
     row_ind, col_ind = linear_sum_assignment(cost_matrix)
     return list(zip(row_ind, col_ind))
 
@@ -174,6 +179,14 @@ class FlowCandidateMaker:
     def get_candidates(
         self, track_matching_queue: Deque[MatchedInstance], t: int, img: np.ndarray
     ) -> List[ShiftedInstance]:
+        """Returns a list of candidate instances for matching.
+
+        Args:
+            track_matching_queue: A list of previously matched instances from
+                which we'll draw candidates for matching.
+            t: The timestep for which we're generating candidates.
+            img: The image for this timestep.
+        """
         candidate_instances = []
         for matched_item in track_matching_queue:
             ref_t, ref_img, ref_instances = (
@@ -293,13 +306,27 @@ class FlowCandidateMaker:
 
 @attr.s(auto_attribs=True)
 class SimpleCandidateMaker:
-    """Class for producing list of matching candidates from prior frames."""
+    """Class for producing list of matching candidates from prior frames.
+
+    Every instance in the queue with the minimum number of points (or more)
+    will be considered a candidate.
+
+    Attribute:
+        min_points: Instances much have at least this many points to be
+            included as match candidates.
+    """
 
     min_points: int = 0
 
     def get_candidates(
         self, track_matching_queue: Deque[MatchedInstance], *args, **kwargs
     ) -> List[InstanceType]:
+        """Returns a list of candidate instances for matching.
+
+        Args:
+            track_matching_queue: A list of previously matched instances from
+                which we'll draw candidates for matching.
+        """
         # Build a pool of matchable candidate instances.
         candidate_instances = []
         for matched_item in track_matching_queue:
@@ -393,9 +420,6 @@ class Tracker:
         # Initialize containers for tracked instances at the current timestep.
         tracked_instances = []
         tracked_inds = []
-
-        # Make cache so similarity function doesn't have to recompute everything.
-        # similarity_cache = dict()
 
         # Process untracked instances.
         if len(untracked_instances) > 0:
